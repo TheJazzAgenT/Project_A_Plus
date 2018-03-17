@@ -1,0 +1,279 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>HW1 Part A</title>
+		<meta charset="utf-8">
+		<style>
+			body {
+			  margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+
+    <script src="../js/three.js"></script>
+    <script src="../js/OrbitControls.js"></script>
+    <script src="../js/dat.gui.min.js"></script>
+  
+  <script id="skyboxVS" type="x-shader/x-vertex">
+
+	uniform mat4 modelMatrix;
+	uniform mat4 viewMatrix;
+  uniform mat4 projectionMatrix;
+
+  attribute vec3 position;
+
+	varying vec3 vWorldPosition;
+	
+	void main() {
+		vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+		vWorldPosition = worldPosition.xyz;
+
+		vec4 p = viewMatrix * modelMatrix * vec4(position, 1.0);
+		gl_Position = projectionMatrix * p;
+  }
+    </script>
+
+    <script id="skyboxFS" type="x-shader/x-fragment">
+		precision mediump float;
+		uniform samplerCube tCube;
+		varying vec3 vWorldPosition;
+
+		void main() {
+			gl_FragColor = textureCube( tCube, vec3(  vWorldPosition ) );
+		}
+    </script>
+    <script id="seaVS" type="x-shader/x-vertex">
+  #define SCALE 10.0
+  
+	uniform mat4 modelMatrix;
+	uniform mat4 viewMatrix;
+  uniform mat4 projectionMatrix;
+  uniform vec3 cameraPosition;
+  uniform float uTime;
+
+  attribute vec3 position;
+  attribute vec3 normal;
+  attribute vec2 uv;
+
+  varying vec2 vUv;
+  varying vec3 vI;
+	varying vec3 vWorldNormal;
+  
+  float calculateSurface(float x, float z) {
+    float y = 0.0;
+    y += (sin(x * 1.0 / SCALE + uTime * 1.0) + sin(x * 2.3 / SCALE + uTime * 1.5) + sin(x * 3.3 / SCALE + uTime * 0.4)) / 3.0;
+    y += (sin(z * 0.2 / SCALE + uTime * 1.8) + sin(z * 1.8 / SCALE + uTime * 1.8) + sin(z * 2.8 / SCALE + uTime * 0.8)) / 3.0;
+    return y;
+  }
+	
+	void main() {
+    vUv = uv;
+		//vec4 mvPosition = viewMatrix * modelMatrix * vec4( position, 1.0 );
+    vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+
+    vWorldNormal = normalize( mat3( modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz ) * normal );
+
+    vI = worldPosition.xyz - cameraPosition;
+    
+    float strength = 0.2;
+    vec3 pos = position;
+    pos.z += strength * calculateSurface(pos.x, pos.y);
+    //gl_Position = projectionMatrix * mvPosition;
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(pos, 1.0);
+  }
+    </script>
+
+    <script id="seaFS" type="x-shader/x-fragment">
+		precision mediump float;
+		uniform sampler2D seaTex;
+    uniform samplerCube envMap;
+    uniform float reflectiveness;
+    
+    varying vec2 vUv;
+		varying vec3 vI, vWorldNormal;
+    
+    vec3 m_refract(vec3 I, vec3 N, float ior)
+    { 
+      float cosi = clamp(dot(I, N), -1.0, 1.0); 
+      float etai = 1.0, etat = ior; 
+      vec3 n = N; 
+      if (cosi < 0.0) {
+        cosi = -cosi;
+      }
+      else {
+        float temp = etai;
+        etai = etat;
+        etat = temp;
+        n = -N;
+      } 
+      float eta = etai / etat; 
+      float k = 1.0 - eta * eta * (1.0 - cosi * cosi); 
+      return k < 0.0 ? vec3(0.0) : eta * I + (eta * cosi - sqrt(k)) * n; 
+    }
+    
+    float fresnel(vec3 I, vec3 N, float ior) 
+    { 
+      float kr;
+      float cosi = clamp(dot(I, N), -1.0, 1.0); 
+      float etai = 1.0, etat = ior; 
+      if (cosi > 0.0) {
+        float temp = etai;
+        etai = etat;
+        etat = temp;
+      } 
+      // Compute sini using Snell's law
+      float sint = etai / etat * sqrt(max(0.0, 1.0 - cosi * cosi)); 
+      // Total internal reflection
+      if (sint >= 1.0) { 
+        kr = 1.0; 
+      } 
+      else { 
+        float cost = sqrt(max(0.0, 1.0 - sint * sint)); 
+        cosi = abs(cosi); 
+        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost)); 
+        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost)); 
+        kr = (Rs * Rs + Rp * Rp) / 2.0; 
+      }
+      return kr;
+      // As a consequence of the conservation of energy, transmittance is given by:
+      // kt = 1 - kr;
+    } 
+    
+		void main() {
+      vec3 reflection = reflect( vI, vWorldNormal );
+      vec3 refraction = m_refract(vI, vWorldNormal, 1.3);
+      float fv = fresnel(vI, vWorldNormal, 1.3);
+      vec4 reflectColor = textureCube( envMap, vec3( -reflection.x, reflection.yz ) );
+      vec4 refractColor = textureCube( envMap, refraction );
+      gl_FragColor = vec4(fv, fv, fv, 1.0);
+      gl_FragColor = reflectColor * fv + refractColor * (1.0 - fv);
+      //gl_FragColor = refractColor;
+		}
+    </script>
+
+	<script>
+var container;
+var options, camera, scene, renderer;
+var skyMesh;
+var sb_vs = document.getElementById( 'skyboxVS' ).textContent;
+var sb_fs = document.getElementById( 'skyboxFS' ).textContent;
+var sea_vs = document.getElementById( 'seaVS' ).textContent;
+var sea_fs = document.getElementById( 'seaFS' ).textContent;
+var texture2 = new THREE.TextureLoader().load( 'sea.png' );
+gui = new dat.GUI( { width: 350 } );
+
+init();
+animate();
+
+function init() {
+	container = document.getElementById( 'container' );
+	camera = new THREE.PerspectiveCamera( 25.0, window.innerWidth / window.innerHeight, 0.1, 2000 );
+	//adds a default mouse listener to control the camera rotation and zoom
+	var controls = new THREE.OrbitControls( camera );
+	camera.position.z = -2;
+	camera.position.y = 1;
+	//camera.position.x = -5;
+	controls.update();
+  
+  options = {
+    displacement: 0.8,
+    waterLevel: 0.3,//0.5,
+    grassyness: 0.77,
+    reflectiveness: 0.5
+  };
+  gui.add( options, "displacement", 0, 2 );
+  gui.add( options, "waterLevel", 0, 2 );
+  gui.add( options, "grassyness", 0, 1 );
+  gui.add( options, "reflectiveness", 0, 1 );
+  
+	scene = new THREE.Scene();
+  
+  //=====Skybox=====
+  var cubeMap = new THREE.CubeTextureLoader()
+    .setPath("./skyboxset1/ThickCloudsWater/")
+    .load( [
+      'posx.png',
+      'negx.png',
+      'posy.png',
+      'negy.png',
+      'posz.png',
+      'negz.png'
+    ] );
+  
+  var uniformsSB = { "tCube": { type: "t", value: cubeMap } };
+  
+  var materialSB = new THREE.RawShaderMaterial( {
+    uniforms: uniformsSB,
+    vertexShader: sb_vs,
+    fragmentShader: sb_fs
+  } );
+
+  materialSB.depthWrite = false;
+  materialSB.side = THREE.BackSide;
+
+  var geometrySB = new THREE.BoxGeometry( 2000, 2000, 2000 );
+  skyMesh = new THREE.Mesh( geometrySB, materialSB );
+  scene.add( skyMesh );
+  
+  //====SEA====
+  var seaGeometry = new THREE.PlaneGeometry(2000, 2000, 500, 500);
+  
+  var seaUniforms = {
+    seaTex: {type: "t", value: texture2},
+    envMap: {type: "t", value: cubeMap},
+    uTime: {type: "float", value: 0.0},
+    reflectiveness: {type: "float", value: options.reflectiveness},
+  };
+  
+  var seaMaterial = new THREE.RawShaderMaterial({
+    uniforms: seaUniforms,
+    vertexShader: sea_vs,
+    fragmentShader: sea_fs,
+  });
+
+  
+  var seaMesh = new THREE.Mesh(seaGeometry, seaMaterial);
+  seaMesh.material.side = THREE.DoubleSide;
+  seaMesh.rotateX(-Math.PI/2);
+  seaMesh.translateZ(0.2);
+  seaMesh.name = "sea";
+  scene.add(seaMesh);
+  
+	renderer = new THREE.WebGLRenderer();
+	renderer.setClearColor( 0x999999 );
+	renderer.setPixelRatio( window.devicePixelRatio );
+	renderer.setSize( window.innerWidth, window.innerHeight );
+	container.appendChild( renderer.domElement );
+  
+  window.addEventListener( 'resize', onWindowResize, false );
+}
+
+function onWindowResize( event ) {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize( window.innerWidth, window.innerHeight );
+}
+function animate() {
+  requestAnimationFrame( animate );
+  render();
+}
+
+function render() {
+  var time = performance.now();
+  var sea = scene.getObjectByName("sea");
+	//object0.material.uniforms.displaceAmt.value = 0.5 * (1.0 + Math.sin(time * 0.001));
+  sea.position.set(sea.position.x, options.waterLevel, sea.position.z);
+  sea.material.uniforms.reflectiveness.value = options.reflectiveness;
+  sea.material.uniforms.uTime.value = time * 0.0005;
+  renderer.render( scene, camera );
+}
+	</script>
+
+	</body>
+</html>
+
