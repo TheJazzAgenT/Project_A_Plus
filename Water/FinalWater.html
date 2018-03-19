@@ -18,7 +18,9 @@
     <script src="../js/three.js"></script>
     <script src="../js/OrbitControls.js"></script>
     <script src="../js/dat.gui.min.js"></script>
-  
+  	<script src="../js/Iceland.js"></script>
+		<script src="../shader/vertexShader_hmap.js"></script>
+		<script src="../shader/fragShader_hmap.js"></script>
   <script id="skyboxVS" type="x-shader/x-vertex">
 
 	uniform mat4 modelMatrix;
@@ -28,7 +30,7 @@
   attribute vec3 position;
 
 	varying vec3 vWorldPosition;
-	
+
 	void main() {
 		vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
 		vWorldPosition = worldPosition.xyz;
@@ -49,7 +51,7 @@
     </script>
     <script id="seaVS" type="x-shader/x-vertex">
   #define SCALE 10.0
-  
+
 	uniform mat4 modelMatrix;
 	uniform mat4 viewMatrix;
   uniform mat4 projectionMatrix;
@@ -63,14 +65,14 @@
   varying vec2 vUv;
   varying vec3 vI;
 	varying vec3 vWorldNormal;
-  
+
   float calculateSurface(float x, float z) {
     float y = 0.0;
     y += (sin(x * 1.0 / SCALE + uTime * 1.0) + sin(x * 2.3 / SCALE + uTime * 1.5) + sin(x * 3.3 / SCALE + uTime * 0.4)) / 3.0;
     y += (sin(z * 0.2 / SCALE + uTime * 1.8) + sin(z * 1.8 / SCALE + uTime * 1.8) + sin(z * 2.8 / SCALE + uTime * 0.8)) / 3.0;
     return y;
   }
-	
+
 	void main() {
     vUv = uv;
 		//vec4 mvPosition = viewMatrix * modelMatrix * vec4( position, 1.0 );
@@ -79,7 +81,7 @@
     vWorldNormal = normalize( mat3( modelMatrix[0].xyz, modelMatrix[1].xyz, modelMatrix[2].xyz ) * normal );
 
     vI = worldPosition.xyz - cameraPosition;
-    
+
     float strength = 0.2;
     vec3 pos = position;
     pos.z += strength * calculateSurface(pos.x, pos.y);
@@ -93,15 +95,15 @@
 		uniform sampler2D seaTex;
     uniform samplerCube envMap;
     uniform float reflectiveness;
-    
+
     varying vec2 vUv;
 		varying vec3 vI, vWorldNormal;
-    
+
     vec3 m_refract(vec3 I, vec3 N, float ior)
-    { 
-      float cosi = clamp(dot(I, N), -1.0, 1.0); 
-      float etai = 1.0, etat = ior; 
-      vec3 n = N; 
+    {
+      float cosi = clamp(dot(I, N), -1.0, 1.0);
+      float etai = 1.0, etat = ior;
+      vec3 n = N;
       if (cosi < 0.0) {
         cosi = -cosi;
       }
@@ -110,40 +112,40 @@
         etai = etat;
         etat = temp;
         n = -N;
-      } 
-      float eta = etai / etat; 
-      float k = 1.0 - eta * eta * (1.0 - cosi * cosi); 
-      return k < 0.0 ? vec3(0.0) : eta * I + (eta * cosi - sqrt(k)) * n; 
+      }
+      float eta = etai / etat;
+      float k = 1.0 - eta * eta * (1.0 - cosi * cosi);
+      return k < 0.0 ? vec3(0.0) : eta * I + (eta * cosi - sqrt(k)) * n;
     }
-    
-    float fresnel(vec3 I, vec3 N, float ior) 
-    { 
+
+    float fresnel(vec3 I, vec3 N, float ior)
+    {
       float kr;
-      float cosi = clamp(dot(I, N), -1.0, 1.0); 
-      float etai = 1.0, etat = ior; 
+      float cosi = clamp(dot(I, N), -1.0, 1.0);
+      float etai = 1.0, etat = ior;
       if (cosi > 0.0) {
         float temp = etai;
         etai = etat;
         etat = temp;
-      } 
+      }
       // Compute sini using Snell's law
-      float sint = etai / etat * sqrt(max(0.0, 1.0 - cosi * cosi)); 
+      float sint = etai / etat * sqrt(max(0.0, 1.0 - cosi * cosi));
       // Total internal reflection
-      if (sint >= 1.0) { 
-        kr = 1.0; 
-      } 
-      else { 
-        float cost = sqrt(max(0.0, 1.0 - sint * sint)); 
-        cosi = abs(cosi); 
-        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost)); 
-        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost)); 
-        kr = (Rs * Rs + Rp * Rp) / 2.0; 
+      if (sint >= 1.0) {
+        kr = 1.0;
+      }
+      else {
+        float cost = sqrt(max(0.0, 1.0 - sint * sint));
+        cosi = abs(cosi);
+        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost));
+        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost));
+        kr = (Rs * Rs + Rp * Rp) / 2.0;
       }
       return kr;
       // As a consequence of the conservation of energy, transmittance is given by:
       // kt = 1 - kr;
-    } 
-    
+    }
+
 		void main() {
       vec3 reflection = reflect( vI, vWorldNormal );
       vec3 refraction = m_refract(vI, vWorldNormal, 1.3);
@@ -160,6 +162,7 @@
 var container;
 var options, camera, scene, renderer;
 var skyMesh;
+var iceland;
 var sb_vs = document.getElementById( 'skyboxVS' ).textContent;
 var sb_fs = document.getElementById( 'skyboxFS' ).textContent;
 var sea_vs = document.getElementById( 'seaVS' ).textContent;
@@ -172,27 +175,28 @@ animate();
 
 function init() {
 	container = document.getElementById( 'container' );
-	camera = new THREE.PerspectiveCamera( 25.0, window.innerWidth / window.innerHeight, 0.1, 2000 );
+	camera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 2000 );
 	//adds a default mouse listener to control the camera rotation and zoom
 	var controls = new THREE.OrbitControls( camera );
-	camera.position.z = -2;
-	camera.position.y = 1;
-	//camera.position.x = -5;
+	camera.position.z = 132;
+	camera.position.y = 20;
+	camera.position.x = -41;
+	camera.rotation.x = 0.23;
 	controls.update();
-  
+
   options = {
     displacement: 0.8,
-    waterLevel: 0.3,//0.5,
+    waterLevel: 16.0,//0.5,
     grassyness: 0.77,
     reflectiveness: 0.5
   };
   gui.add( options, "displacement", 0, 2 );
-  gui.add( options, "waterLevel", 0, 2 );
+  gui.add( options, "waterLevel", 0, 100 );
   gui.add( options, "grassyness", 0, 1 );
   gui.add( options, "reflectiveness", 0, 1 );
-  
+
 	scene = new THREE.Scene();
-  
+
   //=====Skybox=====
   var cubeMap = new THREE.CubeTextureLoader()
     .setPath("./skyboxset1/ThickCloudsWater/")
@@ -204,9 +208,9 @@ function init() {
       'posz.png',
       'negz.png'
     ] );
-  
+
   var uniformsSB = { "tCube": { type: "t", value: cubeMap } };
-  
+
   var materialSB = new THREE.RawShaderMaterial( {
     uniforms: uniformsSB,
     vertexShader: sb_vs,
@@ -219,37 +223,43 @@ function init() {
   var geometrySB = new THREE.BoxGeometry( 2000, 2000, 2000 );
   skyMesh = new THREE.Mesh( geometrySB, materialSB );
   scene.add( skyMesh );
-  
+
   //====SEA====
-  var seaGeometry = new THREE.PlaneGeometry(2000, 2000, 500, 500);
-  
+  var seaGeometry = new THREE.PlaneGeometry(400, 400, 100, 100);
+
   var seaUniforms = {
     seaTex: {type: "t", value: texture2},
     envMap: {type: "t", value: cubeMap},
     uTime: {type: "float", value: 0.0},
     reflectiveness: {type: "float", value: options.reflectiveness},
   };
-  
+
   var seaMaterial = new THREE.RawShaderMaterial({
     uniforms: seaUniforms,
     vertexShader: sea_vs,
     fragmentShader: sea_fs,
   });
 
-  
+
   var seaMesh = new THREE.Mesh(seaGeometry, seaMaterial);
   seaMesh.material.side = THREE.DoubleSide;
   seaMesh.rotateX(-Math.PI/2);
-  seaMesh.translateZ(0.2);
+  seaMesh.translateZ(0.0);
   seaMesh.name = "sea";
   scene.add(seaMesh);
-  
+
+	//terrain
+	iceland = CreateTerrain(400.0, 400.0, cubeMap);
+	iceland.rotation.x = - Math.PI / 2.0;
+	iceland.translateZ(0.0);
+	scene.add( iceland );
+
 	renderer = new THREE.WebGLRenderer();
 	renderer.setClearColor( 0x999999 );
 	renderer.setPixelRatio( window.devicePixelRatio );
 	renderer.setSize( window.innerWidth, window.innerHeight );
 	container.appendChild( renderer.domElement );
-  
+
   window.addEventListener( 'resize', onWindowResize, false );
 }
 
@@ -276,4 +286,3 @@ function render() {
 
 	</body>
 </html>
-
