@@ -25,8 +25,10 @@
 
 		<div id="container"></div>
 
-		<script src="js/three.js"></script>
-        <script src="js/TrackballControls.js"></script>
+		<script src="../js/three.js"></script>
+        <script src="../js/TrackballControls.js"></script>
+        <script src="../js/OrbitControls.js"></script>
+
 
 
 	</script>
@@ -55,7 +57,6 @@
 
 		precision mediump float;
 
-		//uniform sampler2D tex;
 		uniform vec2 iResolution; // must be passed in as uniform
 		uniform vec2 iMouse; // must be passed in as uniform - this is the position of the mouse for moving the camera 'look at'
 		uniform float time; // time since shader started passed in as uniform
@@ -66,6 +67,8 @@
 	// utility functions
 		
 		mat2 mm2(in float a){float c = cos(a), s = sin(a);return mat2(c,s,-s,c);}
+        
+        //variables
 		mat2 m2 = mat2(0.95534, 0.29552, -0.29552, 0.95534);
 		float tri(in float x){return clamp(abs(fract(x)-.5),0.01,0.49);}
 		vec2 tri2(in vec2 p){return vec2(tri(p.x)+tri(p.y),tri(p.y+tri(p.x)));}
@@ -117,7 +120,7 @@
                     //rd = ray direction (unit vector)
                     //bpos = boundary position
                     //pt = ray into scene
-                    //
+                    
 						float of = 0.01*hash21(gl_FragCoord.xy)*smoothstep(0.,15., i); //of is the sdf func?
 						float pt = ((.8+pow(i,1.4)*.002)-ro.y)/(rd.y*2.+0.4);
 						//pt -= of;
@@ -134,65 +137,8 @@
 				
 				col *= (clamp(rd.y*15.+.4,0.,1.));
 				
-				
-				//return clamp(pow(col,vec4(1.3))*1.5,0.,1.);
-				//return clamp(pow(col,vec4(1.7))*2.,0.,1.);
-				//return clamp(pow(col,vec4(1.5))*2.5,0.,1.);
-				//return clamp(pow(col,vec4(1.8))*1.5,0.,1.);
-				
-				//return smoothstep(0.,1.1,pow(col,vec4(1.))*1.5);
-				//return col*1.8;
                 return col*4.0;
-				//return pow(col,vec4(1.))*2.
 		} // end: aurora
-
-
-
-//-------------------Background and Stars--------------------
-/*
-//From Dave_Hoskins (https://www.shadertoy.com/view/4djSRW)
-				
-	//////////
-	// HASH 33
-				
-	vec3 hash33(vec3 p) // called by stars() only
-	{
-			p = fract(p * vec3(443.8975,397.2973, 491.1871));
-			p += dot(p.zxy, p.yxz+19.27);
-			return fract(vec3(p.x * p.y, p.z*p.x, p.y*p.z));
-	}
-	
-	/////////////
-	// STARS
-				
-	vec3 stars(in vec3 p) // called by mainImage() only
-	{
-			vec3 c = vec3(0.);
-			float res = iResolution.x*1.;
-			
-		for (float i=0.;i<4.;i++)
-			{
-					vec3 q = fract(p*(.15*res))-0.5;
-					vec3 id = floor(p*(.15*res));
-					vec2 rn = hash33(id).xy;
-					float c2 = 1.-smoothstep(0.,.6,length(q));
-					c2 *= step(rn.x,.0005+i*i*0.001);
-					c += c2*(mix(vec3(1.0,0.49,0.1),vec3(0.75,0.9,1.),rn.y)*0.1+0.9);
-					p *= 1.3;
-			}
-			return c*c*.8;
-	}
-*/
-	////////////////
-	// BACKGROUND
-	/*
-	vec3 bg(in vec3 rd) // called by main to color the background (both above and below the water line of the lake)
-	{
-			float sd = dot(normalize(vec3(-0.5, -0.6, 0.9)), rd)*0.5+0.5;
-			sd = pow(sd, 5.);
-			vec3 col = mix(vec3(0.05,0.1,0.2), vec3(0.1,0.05,0.2), sd);
-			return col*.63;
-	}*/
 		
 //-----------------------------------------------------------
 				
@@ -223,38 +169,18 @@
 				
 				rd.xz *= mm2(mo.x + sin(0.0*0.05)*0.2); // here we modify xz of rd based on time.... is this the camera motion?
 				
-				//vec3 col = vec3(0.); // this will be our output color
-				//vec3 brd = rd; // a copy of rd? but why?
-				
+        
 				float fade = smoothstep(0.,0.01,abs(rd.y))*0.1+0.9; // return an interpolated fade factor between 0 and 1, based on the y vertical location of the framgment between 0 and 0.1
 				
-				//col = bg(rd)*fade; // start with the background color
 				vec3 col = vec3(0.05, 0.023, 0.18); //background color = navy
                 
                 
 				// above the lake....
 				//if (rd.y > 0.){ // if we are drawing above the lake, then draw stars & auroras
 						vec4 aur = smoothstep(0.,1.5,aurora(ro,rd))*fade; // get the color of the auroras at this fragment
-						//col += stars(rd); // add the star color at this xy location to the output color
 						col = col*(1.-aur.a) + aur.rgb; //changes color from black to blueish
 
 				//}
-				/*
-				// below the lake line (in the lake)
-				else //Reflections
-				{
-						rd.y = abs(rd.y);
-						//col = bg(rd)*fade*0.6;
-                        col = vec3(0.0, 0.0, 0.0);
-
-						vec4 aur = smoothstep(0.0,2.5,aurora(ro,rd));
-						//col += stars(rd)*0.1;
-						col = col*(1.-aur.a) + aur.rgb;
-						vec3 pos = ro + ((0.5-ro.y)/rd.y)*rd;
-						float nz2 = triNoise2d(pos.xz*vec2(.5,.7), 0.);
-						col += mix(vec3(0.2,0.25,0.5)*0.08,vec3(0.3,0.3,0.5)*0.7, nz2*0.4);
-				}
-                 */
                  
 				
 			fragColor = vec4(col, 1.);
@@ -262,9 +188,6 @@
 				
 		//^^^^^^  aurora code ends here
 
-				//vec4 c = texture2D(tex, vUV);
-        //gl_FragColor = vec4(vUV.xy, 0.0, 1.0);
-        //gl_FragColor = vec4(c.rgb, 1.0);
 				gl_FragColor = fragColor;
 		}
 
@@ -288,7 +211,7 @@
         var texWidth = 500;
         var texHeight = 500;
 
-
+        var boxGeom;
         
 		init(); // call our global init() function to setup the scene
 		animate(); // now animate! (which means render)
@@ -305,7 +228,7 @@
 
 			container = document.getElementById( 'container' );
 			
-	// CAMERA
+                // CAMERA
 	
 			var cameraDefaultPosition = [0, 0, 10]; // we use this in our keyboard function to reset the camera, when the space bar is hit
 		
@@ -335,9 +258,7 @@
 	
 		//var objTex = new THREE.TextureLoader().load( 'angus.jpg' );
 		uniformsAUR = {
-						//tex: { type: "t", value: objTex  },
 						iResolution: { type: "v2", value: new THREE.Vector2(texWidth, texHeight)}, // mouse coords on the plane?
-						//iMouse: { type: "v2", value: new THREE.Vector2(texWidth/2.0, texHeight/2.0)}, // mouse at center screen
 						iMouse: { type: "v2", value: new THREE.Vector2(shcameraPosition.x, shcameraPosition.y)}, // mouse at center screen
 						time: {type: "float", value: 0.0}, // time since shaders tarted
 		};
@@ -357,13 +278,12 @@
 
 	// geometry
 
-	var planeGeom = new THREE.BoxGeometry( 5000, 5000, 5000 ); // width, height, width segs, height segs
+	boxGeom = new THREE.BoxGeometry( 5000, 5000, 5000 ); // width, height, width segs, height segs
 
-	planeObject = new THREE.Mesh( planeGeom, materialAUR );
-	planeObject.material.side = THREE.DoubleSide;
-	//planeObject.rotateX(-Math.PI/2);
-	planeObject.scale.set(-1, -1, -1);
-	scene.add( planeObject );
+	boxObject = new THREE.Mesh( boxGeom, materialAUR );
+	boxObject.material.side = THREE.DoubleSide;
+	boxObject.scale.set(-1, -1, -1);
+	scene.add( boxObject );
 		
         
         
@@ -400,14 +320,9 @@
 			container.appendChild( renderer.domElement ); // attach the renderer to the 'container' element (see html above)
 		
         window.addEventListener( 'resize', onWindowResize, false ); // allow resize events to call the 'onWindowResize' function below
-        //document.addEventListener('mousemove', onDocumentMouseMove, false);// allow mousemove events to call the 'onDocumentMouseMove' function below
-            //document.addEventListener('keydown', onKeyDown, false); // allow arrow keys to move camera
-            //document.addEventListener( 'mousedown', onDocumentMouseDown, false );
-                //document.addEventListener( 'mouseup', onMouseUp, false );
-
+  
         
-        
-        controls = new THREE.TrackballControls( camera, renderer.domElement );
+        controls = new THREE.OrbitControls( camera, renderer.domElement );
         controls.rotateSpeed = 5.0;
         controls.zoomSpeed = 2.2;
         controls.panSpeed = 1;
@@ -447,7 +362,7 @@
 	// some global variables
 		
 		var mouseX = 0.5; // mouseX == .5 means half-way across the screen from left to write (the screen is normalized 0(left) to 1(right))
-		var mouseY = -0.5; // similar to above: with mouseY 0 (TOP!) to -1 (bottom)
+		var mouseY = 0.5; // similar to above: with mouseY 0 (TOP!) to -1 (bottom)
 		var prevMouseX = 0.5;
 		var prevMouseY = 0.5;
         
@@ -457,35 +372,19 @@
         var mouseDifX = 0.;
         var mouseDifY = 0.;
         
-        //var mouseDownBool = false;
 
 
 
-var mouseDownBool = 0.;
-document.body.onmousedown = function() {
-    console.log("please help");
-    mouseDownBool = 0.;
-}
-    document.body.onmouseup = function() {
-        mouseDownBool = 1.;
-    }
-    
+        var mouseDownBool = 0;
+
+
 
 
 	// RENDER function - called from animate
 	
 	function render() { // this is our function called from animate... it could be called anything: foo(), banana(), etc.
-	
-        /*
-		if (mouseX < prevMouseX) {
-			camera.rotation.y += 0.03;
-		} else if (mouseX > prevMouseX) {
-			camera.rotation.y -= 0.03;
-		}
-		*/
         
-		//planeObject.material.uniforms.displaceAmt.value = 1.0;
-	
+
         mouseDifX = mouseX-prevMouseX;
         mouseDifY = mouseY - prevMouseY;
     
@@ -493,57 +392,28 @@ document.body.onmousedown = function() {
 		prevMouseX = mouseX;
 		prevMouseY = mouseY;
 	
-    
-    
-    
-        
         uniformsAUR.time.value += .5;
         //uniformsAUR.time.value += .0;
 
-        //if (mouseDownBool == true){
-            //uniformsAUR.iMouse.value.x = (mouseX * texWidth) - texWidth/2.0;
-            //uniformsAUR.iMouse.value.y = -1.0*((mouseY * texHeight) + texHeight/2.0);
-            if (mouseDownBool){
-              uniformsAUR.iMouse.value.x += 5.;
-              uniformsAUR.iMouse.value.y += 0.;
-            } else {
-                uniformsAUR.iMouse.value.x += 0.;
-                uniformsAUR.iMouse.value.y += 0.;
-
-            }
-        //}
         
+        uniformsAUR.iMouse.value = new THREE.Vector2(camera.position.x, -camera.position.y);
         
 		renderer.render( scene, camera ); // render the scene object, with the provided camera object
 	}
 
-/*function onDocumentMouseDown( event ) {
-    event.preventDefault();
-
-    mouseDownBool = true;
-    console.log("mousedown");
-
-}
-
-function onMouseUp( event ){
-    //mouseDownBool = false;
-}
 
 	function onDocumentMouseMove(event) { // this is what we call when the mouse moves just to update mouseX, and mouseY
 		event.preventDefault();
 	
-		mouseX = (event.clientX / window.innerWidth) ;
-		mouseY = -(event.clientY / window.innerHeight) ; // not sure why we make Y negative range here: zero top, negative 1 bottom ??
+		//mouseX = (event.clientX / window.innerWidth) ;
+		//mouseY = -(event.clientY / window.innerHeight) ; // not sure why we make Y negative range here: zero top, negative 1 bottom ??
 	
-    console.log("mousemove");
+    //console.log("mousemove");
     //console.log(mouseDifX);
 
 
-        
-        //shcameraPosition.x = mouseX;
-        //shcameraPosition.y = mouseY;
 	}
-	*/
+	
 	</script>
 	</body>
 </html>
