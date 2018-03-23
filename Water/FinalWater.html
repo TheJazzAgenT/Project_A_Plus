@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>HW1 Part A</title>
+		<title>A Really Cold Place</title>
 		<meta charset="utf-8">
 		<style>
 			body {
@@ -21,6 +21,43 @@
   	<script src="../js/Iceland.js"></script>
 		<script src="../shader/vertexShader_hmap.js"></script>
 		<script src="../shader/fragShader_hmap.js"></script>
+		
+	<script id="snowSDF/VS" type="x-shader/x-vertex">
+	uniform mat4 modelViewMatrix;
+	uniform mat4 projectionMatrix;
+    attribute vec3 position;
+	void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); 
+	}
+    </script>
+	<script id="snowSDF/FS" type="x-shader/x-fragment">
+	precision mediump float;
+	uniform float rx, ry, time;
+	uniform sampler2D textureBuffer;
+	vec2 uv;
+	float rnd(float rx)
+	{
+		return fract(sin(dot(vec2(rx+47.49,38.2467/(rx+2.3)), vec2(12.9898, 78.233)))* (43758.5453));
+	}
+	float drawCircle(vec2 center, float radius)
+	{
+		return 1.0 - smoothstep(0.0, radius, length(uv - center));
+	}
+	void main()
+	{
+		uv = gl_FragCoord.xy / vec2(rx, ry);
+		gl_FragColor = texture2D(textureBuffer, uv);
+		float j;
+		for(int i = 0; i < 200; i++)
+		{
+			j = float(i);
+			float speed = 0.01+rnd(cos(j))*(0.7+0.5*cos(j/(float(210)*0.25)));
+			vec2 center = vec2((0.25-uv.y)*0.2+rnd(j)+0.1*cos((time*0.05)+sin(j)), mod(sin(j)-speed*(time*0.1*(0.1+0.2)), 1.0));
+			gl_FragColor += vec4(0.65*drawCircle(center, 0.002+speed*0.012));
+		}
+	}
+	</script>
+	
   <script id="skyboxVS" type="x-shader/x-vertex">
 
 	uniform mat4 modelMatrix;
@@ -167,33 +204,42 @@ var sb_vs = document.getElementById( 'skyboxVS' ).textContent;
 var sb_fs = document.getElementById( 'skyboxFS' ).textContent;
 var sea_vs = document.getElementById( 'seaVS' ).textContent;
 var sea_fs = document.getElementById( 'seaFS' ).textContent;
+var snow_vs = document.getElementById( 'snowSDF/VS' ).textContent;
+var snow_fs = document.getElementById( 'snowSDF/FS' ).textContent;
 var texture2 = new THREE.TextureLoader().load( 'sea.png' );
-gui = new dat.GUI( { width: 350 } );
+//gui = new dat.GUI( { width: 350 } );
+//Buffer Items
+var bufferObject = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight );
+var bufferScene = new THREE.Scene();
+var bufferCamera;
 
 init();
 animate();
 
 function init() {
 	container = document.getElementById( 'container' );
-	camera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 2000 );
+	camera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 50 );
+	camera.position.z = 2.0;
+	bufferCamera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 2000 );
 	//adds a default mouse listener to control the camera rotation and zoom
-	var controls = new THREE.OrbitControls( camera );
-	camera.position.z = 132;
-	camera.position.y = 20;
-	camera.position.x = -41;
-	camera.rotation.x = 0.23;
+	var controls = new THREE.OrbitControls( bufferCamera );
+	bufferCamera.position.z = 175;
+	bufferCamera.position.y = 20;
+	bufferCamera.position.x = -41;
+	bufferCamera.rotation.x = 0.23;
+	bufferCamera.translateZ(10.0);
 	controls.update();
 
-  options = {
-    displacement: 0.8,
-    waterLevel: 16.0,//0.5,
-    grassyness: 0.77,
-    reflectiveness: 0.5
-  };
-  gui.add( options, "displacement", 0, 2 );
-  gui.add( options, "waterLevel", 0, 100 );
-  gui.add( options, "grassyness", 0, 1 );
-  gui.add( options, "reflectiveness", 0, 1 );
+	options = {
+		displacement: 0.8,
+		waterLevel: 13.8,//0.5,
+		grassyness: 0.77,
+		reflectiveness: 0.5
+	};
+	//gui.add( options, "displacement", 0, 2 );
+	//gui.add( options, "waterLevel", 0, 100 );
+	//gui.add( options, "grassyness", 0, 1 );
+	//gui.add( options, "reflectiveness", 0, 1 );
 
 	scene = new THREE.Scene();
 
@@ -222,7 +268,7 @@ function init() {
 
   var geometrySB = new THREE.BoxGeometry( 2000, 2000, 2000 );
   skyMesh = new THREE.Mesh( geometrySB, materialSB );
-  scene.add( skyMesh );
+  bufferScene.add( skyMesh );
 
   //====SEA====
   var seaGeometry = new THREE.PlaneGeometry(400, 400, 100, 100);
@@ -246,13 +292,29 @@ function init() {
   seaMesh.rotateX(-Math.PI/2);
   seaMesh.translateZ(0.0);
   seaMesh.name = "sea";
-  scene.add(seaMesh);
+  bufferScene.add(seaMesh);
 
 	//terrain
 	iceland = CreateTerrain(400.0, 400.0, cubeMap);
 	iceland.rotation.x = - Math.PI / 2.0;
 	iceland.translateZ(0.0);
-	scene.add( iceland );
+	bufferScene.add( iceland );
+	
+	//======Snow======
+	var snowUniforms = {
+		rx: {type: "f", value: window.innerWidth*1.3},
+        ry: {type: "f", value: window.innerHeight*1.3},
+		time: {type: "f", value: 0.0},
+		textureBuffer: {type: "t"},
+	};
+	var snowMaterial = new THREE.RawShaderMaterial( {
+		uniforms: snowUniforms,
+		vertexShader: snow_vs,
+		fragmentShader: snow_fs,
+	} );
+	var snowScreen = new THREE.PlaneGeometry( window.innerWidth, window.innerHeight);
+	var fullSnowQuad = new THREE.Mesh( snowScreen, snowMaterial );
+	scene.add(fullSnowQuad);
 
 	renderer = new THREE.WebGLRenderer();
 	renderer.setClearColor( 0x999999 );
@@ -264,6 +326,8 @@ function init() {
 }
 
 function onWindowResize( event ) {
+  bufferCamera.aspect = window.innerWidth / window.innerHeight;
+  bufferCamera.updateProjectionMatrix();
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize( window.innerWidth, window.innerHeight );
@@ -274,13 +338,17 @@ function animate() {
 }
 
 function render() {
-  var time = performance.now();
-  var sea = scene.getObjectByName("sea");
+	var time = performance.now();
+	var sea = bufferScene.getObjectByName("sea");
 	//object0.material.uniforms.displaceAmt.value = 0.5 * (1.0 + Math.sin(time * 0.001));
-  sea.position.set(sea.position.x, options.waterLevel, sea.position.z);
-  sea.material.uniforms.reflectiveness.value = options.reflectiveness;
-  sea.material.uniforms.uTime.value = time * 0.0005;
-  renderer.render( scene, camera );
+	sea.position.set(sea.position.x, options.waterLevel, sea.position.z);
+	sea.material.uniforms.reflectiveness.value = options.reflectiveness;
+	sea.material.uniforms.uTime.value = time * 0.0005;
+	var object1 = scene.children[ 0 ];
+	object1.material.uniforms.time.value = time * 0.005;
+	renderer.render(bufferScene,bufferCamera,bufferObject);
+	object1.material.uniforms.textureBuffer.value = bufferObject.texture;
+	renderer.render( scene, camera );
 }
 	</script>
 
