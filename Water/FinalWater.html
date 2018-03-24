@@ -196,7 +196,7 @@
 		{
 			j = float(i);
 			float speed = 0.01+rnd(cos(j))*(0.7+0.5*cos(j/(float(210)*0.25)));
-			vec2 center = vec2((0.25-uv.y)*0.2+rnd(j)+0.1*cos((time*0.05)+sin(j)), mod(sin(j)-speed*(time*0.1*(0.1+0.2)), 1.0));
+			vec2 center = vec2((0.25-uv.y)*0.1+rnd(j)+0.1*cos((time*0.05)+sin(j)), mod(sin(j)-speed*(time*0.1*(0.1+0.2)), 1.0));
 			gl_FragColor += vec4(0.65*drawCircle(center, 0.002+speed*0.012));
 		}
 	}
@@ -395,7 +395,7 @@ function init() {
 	bufferCamera.position.y = 20;
 	bufferCamera.position.x = -20;
 	//bufferCamera.rotation.x = 0.23;
-	bufferCamera.translateZ(10.0);
+	bufferCamera.translateY(3.0);
 	controls.update();
 
 	options = {
