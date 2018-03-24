@@ -274,7 +274,8 @@
     <script id="seaFS" type="x-shader/x-fragment">
 		precision mediump float;
 		uniform sampler2D seaTex;
-    uniform samplerCube envMap;
+    uniform samplerCube aurCube;
+    uniform samplerCube waterCube;
     uniform float reflectiveness;
 
     varying vec2 vUv;
@@ -331,9 +332,9 @@
       vec3 reflection = reflect( vI, vWorldNormal );
       vec3 refraction = m_refract(vI, vWorldNormal, 1.3);
       float fv = fresnel(vI, vWorldNormal, 1.3);
-      vec4 reflectColor = textureCube( envMap, vec3( -reflection.x, reflection.yz ) );
-      vec4 refractColor = textureCube( envMap, refraction );
-      gl_FragColor = vec4(fv, fv, fv, 1.0);
+      vec4 reflectColor = textureCube( aurCube, vec3( -reflection.x, reflection.yz ) );
+      vec4 refractColor = textureCube( aurCube, refraction );
+      //gl_FragColor = vec4(fv, fv, fv, 1.0);
       gl_FragColor = reflectColor * fv + refractColor * (1.0 - fv);
       //gl_FragColor = refractColor;
 		}
@@ -341,7 +342,7 @@
 
 	<script>
 var container;
-var options, camera, scene, renderer;
+var options, camera, cubeCamera, scene, renderer;
 
 var skyMesh;
 
@@ -380,8 +381,13 @@ animate();
 function init() {
 	container = document.getElementById( 'container' );
 	camera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 50 );
-	camera.position.z = 2.0;
+  camera.position.z = 2.0;
+  
+  cubeCamera = new THREE.CubeCamera(1, 10000, 512);
+  bufferScene.add(cubeCamera);
+	
 	bufferCamera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 2000 );
+  
 	//adds a default mouse listener to control the camera rotation and zoom
 	var controls = new THREE.OrbitControls( bufferCamera );
 	bufferCamera.position.z = 175;
@@ -460,7 +466,8 @@ function init() {
 
   var seaUniforms = {
     seaTex: {type: "t", value: texture2},
-    envMap: {type: "t", value: cubeMap},
+    aurCube: {type: "t", value: cubeCamera.renderTarget.texture},
+    waterCube: {type: "t", value: cubeMap},
     uTime: {type: "float", value: 0.0},
     reflectiveness: {type: "float", value: options.reflectiveness},
   };
@@ -483,6 +490,7 @@ function init() {
 	iceland = CreateTerrain(400.0, 400.0, cubeMap);
 	iceland.rotation.x = - Math.PI / 2.0;
 	iceland.translateZ(0.0);
+  iceland.name = "iceland";
 	bufferScene.add( iceland );
 	
 	//======Snow======
@@ -499,6 +507,7 @@ function init() {
 	} );
 	var snowScreen = new THREE.PlaneGeometry( window.innerWidth, window.innerHeight);
 	var fullSnowQuad = new THREE.Mesh( snowScreen, snowMaterial );
+  //fullSnowQuad.name = "snow";
 	scene.add(fullSnowQuad);
 
 	renderer = new THREE.WebGLRenderer();
@@ -525,16 +534,22 @@ function animate() {
 function render() {
 	var time = performance.now();
 	var sea = bufferScene.getObjectByName("sea");
+  var snow = bufferScene.getObjectByName("iceland");
 	//object0.material.uniforms.displaceAmt.value = 0.5 * (1.0 + Math.sin(time * 0.001));
 	sea.position.set(sea.position.x, options.waterLevel, sea.position.z);
-	sea.material.uniforms.reflectiveness.value = options.reflectiveness;
 	sea.material.uniforms.uTime.value = time * 0.0005;
+  sea.visible = false;
+  snow.visible = false;
+  cubeCamera.position.copy( sea.position );
+  cubeCamera.update(renderer, bufferScene);
+  sea.visible = true;
+  snow.visible = true;
 	var object1 = scene.children[ 0 ];
 	object1.material.uniforms.time.value = time * 0.005;
 	renderer.render(bufferScene,bufferCamera,bufferObject);
 	object1.material.uniforms.textureBuffer.value = bufferObject.texture;
-    uniformsAUR.timeAUR.value += .5;
-    uniformsAUR.iMouse.value = new THREE.Vector2(-bufferCamera.position.x*1.5, -bufferCamera.position.y*1.5);
+  uniformsAUR.timeAUR.value += .5;
+  uniformsAUR.iMouse.value = new THREE.Vector2(-bufferCamera.position.x*1.5, -bufferCamera.position.y*1.5);
 
 	renderer.render( scene, camera );
 }
