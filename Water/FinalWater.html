@@ -98,25 +98,25 @@
         // AURORA - calc color of aurora at this location
 
         vec4 aurora(vec3 ro, vec3 rd) {
-            vec4 col = vec4(0);
-            vec4 avgCol = vec4(0);
+            vec4 col = vec4(0); //empty start fragment color
+            vec4 avgCol = vec4(0); //empty start average color
 
-            for(float i=0.;i<20.0;i++) {
+            for(float i=0.;i<20.0;i++) { //ray marching loop with a depth of 20
                 //ro = ray origin
                 //rd = ray direction (unit vector)
                 //bpos = boundary position
                 //pt = ray into scene
 
-                float of = 0.01*hash21(gl_FragCoord.xy)*smoothstep(0.,15., i); //noise value generated from ray depth and xy vals
+                //float of = 0.01*hash21(gl_FragCoord.xy)*smoothstep(0.,15., i); //noise value (hash21()) generated from ray depth and xy vals
                 float pt = ((.8+pow(i,1.4)*.002)-ro.y)/(rd.y*2.+0.4);
 
                 vec3 bpos = ro + pt*rd;
                 vec2 p = bpos.zx;
-                float rzt = triNoise2d(p, 0.06);
-                vec4 col2 = vec4(0,0,0, rzt);
+                float rzt = triNoise2d(p, 0.06); //noise val (triNoise2d()) coming from ?
+                vec4 col2 = vec4(0,0,0, rzt); // create an "empty" color to update which has a noise generated alpha (rzt)
                 col2.rgb = (sin(1.-vec3(2.15,-.5, 1.2)+i*0.043)*0.5+0.5)*rzt;
-                avgCol =  mix(avgCol, col2, .5);
-                col += avgCol*exp2(-i*0.065 - 2.5)*smoothstep(0.,5., i); //increase color
+                avgCol =  mix(avgCol, col2, .5); //update average color
+                col += avgCol*exp2(-i*0.065 - 2.5)*smoothstep(0.,5., i); //update fragment color using the average color
 
             }
 
