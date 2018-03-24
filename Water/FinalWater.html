@@ -107,9 +107,8 @@
                 //bpos = boundary position
                 //pt = ray into scene
 
-                float of = 0.01*hash21(gl_FragCoord.xy)*smoothstep(0.,15., i); //of is the sdf func?
+                float of = 0.01*hash21(gl_FragCoord.xy)*smoothstep(0.,15., i);
                 float pt = ((.8+pow(i,1.4)*.002)-ro.y)/(rd.y*2.+0.4);
-                //pt -= of;
 
                 vec3 bpos = ro + pt*rd;
                 vec2 p = bpos.zx;
@@ -132,12 +131,12 @@
         ///////////
         // MAIN
 
-            void main() {
+        void main() {
             ///// aurora code starts here
             vec2 q = gl_FragCoord.xy / iResolution.xy;
             vec2 p = q - 0.5;
             p.x*=iResolution.x/iResolution.y;
-            vec4  fragColor; // must declare what was the "out" variable from shadertoy
+            vec4  fragColor;
             vec3 ro = vec3(0,0,-6.7);
             vec3 rd = normalize(vec3(p,1.3));
             vec2 mo = iMouse.xy / iResolution.xy-.5;
@@ -146,17 +145,13 @@
 
             rd.yz *= mm2(mo.y);
 
-            rd.xz *= mm2(mo.x + sin(0.0*0.05)*0.2);
+            rd.xz *= mm2(mo.x + sin(0.0*0.05)*0.2); //aurora x and distance values from mm2() using sine vals
             float fade = smoothstep(0.,0.01,abs(rd.y))*0.1+0.9; // return an interpolated fade factor between 0 and 1, based on the y vertical location of the framgment between 0 and 0.1
             vec3 col = vec3(0.05, 0.023, 0.18); //background color = navy
             
-            // above the lake....
-            //if (rd.y > 0.){ // if we are drawing above the lake, then draw stars & auroras
-            rd.y += .2;
-            vec4 aur = smoothstep(0.,1.5,aurora(ro,rd))*fade; // get the color of the auroras at this fragment
-            col = col*(1.-aur.a) + aur.rgb; //changes color from black to blueish
-
-            //}
+            rd.y += .2; //to move the horizon line
+            vec4 aur = smoothstep(0.,1.5,aurora(ro,rd))*fade; // aur = aurora color (using aurora function)
+            col = col*(1.-aur.a) + aur.rgb; //lighten the color by reducing the col alpha and adding the aur color
 
             //^^^^^^  aurora code ends here
 
