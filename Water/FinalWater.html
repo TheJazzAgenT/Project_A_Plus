@@ -22,6 +22,150 @@
 		<script src="../shader/vertexShader_hmap.js"></script>
 		<script src="../shader/fragShader_hmap.js"></script>
 		
+        
+    <script id="vsAUR" type="x-shader/x-vertex">
+
+        //Three.js gives us these automatically when a perspective camera is bound to the renderer
+        uniform mat4 modelMatrix;
+        uniform mat4 viewMatrix;
+        uniform mat4 projectionMatrix;
+
+        attribute vec3 position;
+
+        //varying vec2 vUV;
+
+        void main() {
+            vec4 position = viewMatrix * modelMatrix * vec4(position, 1.0);
+            gl_Position = projectionMatrix * position;
+        }
+    </script>
+        
+        
+        
+        
+        
+    <script id="fsAUR" type="x-shader/x-fragment">
+
+        precision mediump float;
+
+        uniform vec2 iResolution; // must be passed in as uniform
+        uniform vec2 iMouse; // must be passed in as uniform - this is the position of the mouse for moving the camera 'look at'
+        uniform float timeAUR; // time since shader started passed in as uniform
+
+
+        //////////////////////
+        // utility functions
+
+        mat2 mm2(in float a){float c = cos(a), s = sin(a);return mat2(c,s,-s,c);}
+
+        //variables
+        mat2 m2 = mat2(0.95534, 0.29552, -0.29552, 0.95534);
+        float tri(in float x){return clamp(abs(fract(x)-.5),0.01,0.49);}
+        vec2 tri2(in vec2 p){return vec2(tri(p.x)+tri(p.y),tri(p.y+tri(p.x)));}
+
+        ///////////
+        // TRI NOISE 2D
+
+        float triNoise2d(in vec2 p, float spd){ // called by hash21() and mainImage()
+            float z=1.8;
+            float z2=2.5;
+            float rz = 0.;
+            p *= mm2(p.x*0.06);
+            vec2 bp = p;
+
+            for (float i=0.0; i<5.0; i++) {
+                vec2 dg = tri2(bp*1.85)*.75;
+                dg *= mm2(timeAUR*spd); // we use time to alter this value
+                p -= dg/z2;
+
+                bp *= 1.3;
+                z2 *= .45;
+                z *= .42;
+                p *= 1.21 + (rz-1.0)*.02;
+
+                rz += tri(p.x+tri(p.y))*z;
+                p*= -m2;
+            }
+            return clamp(1./pow(rz*29., 1.3),0.,.55);
+        }
+
+        /////////////
+        /// HASH21
+
+        float hash21(in vec2 n){ return fract(sin(dot(n, vec2(13, 4))) * 4400.); }
+
+        ///////////////
+        // AURORA - calc color of aurora at this location
+
+        vec4 aurora(vec3 ro, vec3 rd) {
+            vec4 col = vec4(0);
+            vec4 avgCol = vec4(0);
+
+            for(float i=0.;i<20.0;i++) {
+                //ro = ray origin
+                //rd = ray direction (unit vector)
+                //bpos = boundary position
+                //pt = ray into scene
+
+                float of = 0.01*hash21(gl_FragCoord.xy)*smoothstep(0.,15., i); //of is the sdf func?
+                float pt = ((.8+pow(i,1.4)*.002)-ro.y)/(rd.y*2.+0.4);
+                //pt -= of;
+
+                vec3 bpos = ro + pt*rd;
+                vec2 p = bpos.zx;
+                float rzt = triNoise2d(p, 0.06);
+                vec4 col2 = vec4(0,0,0, rzt);
+                col2.rgb = (sin(1.-vec3(2.15,-.5, 1.2)+i*0.043)*0.5+0.5)*rzt;
+                avgCol =  mix(avgCol, col2, .5);
+                col += avgCol*exp2(-i*0.065 - 2.5)*smoothstep(0.,5., i);
+
+            }
+
+            col *= (clamp(rd.y*15.+.4,0.,1.));
+
+            return col*4.0;
+        } // end: aurora
+
+        //-----------------------------------------------------------
+
+
+        ///////////
+        // MAIN
+
+            void main() {
+            ///// aurora code starts here
+            vec2 q = gl_FragCoord.xy / iResolution.xy;
+            vec2 p = q - 0.5;
+            p.x*=iResolution.x/iResolution.y;
+            vec4  fragColor; // must declare what was the "out" variable from shadertoy
+            vec3 ro = vec3(0,0,-6.7);
+            vec3 rd = normalize(vec3(p,1.3));
+            vec2 mo = iMouse.xy / iResolution.xy-.5;
+            mo = (mo==vec2(-.5))?mo=vec2(-0.1,0.1):mo;
+            mo.x *= iResolution.x/iResolution.y;
+
+            rd.yz *= mm2(mo.y);
+
+            rd.xz *= mm2(mo.x + sin(0.0*0.05)*0.2);
+            float fade = smoothstep(0.,0.01,abs(rd.y))*0.1+0.9; // return an interpolated fade factor between 0 and 1, based on the y vertical location of the framgment between 0 and 0.1
+            vec3 col = vec3(0.05, 0.023, 0.18); //background color = navy
+            
+            // above the lake....
+            //if (rd.y > 0.){ // if we are drawing above the lake, then draw stars & auroras
+            rd.y += .2;
+            vec4 aur = smoothstep(0.,1.5,aurora(ro,rd))*fade; // get the color of the auroras at this fragment
+            col = col*(1.-aur.a) + aur.rgb; //changes color from black to blueish
+
+            //}
+
+            //^^^^^^  aurora code ends here
+
+            gl_FragColor = vec4(col, 1.);
+        }
+
+    </script>
+        
+        
 	<script id="snowSDF/VS" type="x-shader/x-vertex">
 	uniform mat4 modelViewMatrix;
 	uniform mat4 projectionMatrix;
@@ -198,16 +342,33 @@
 	<script>
 var container;
 var options, camera, scene, renderer;
+
 var skyMesh;
+
 var iceland;
+
 var sb_vs = document.getElementById( 'skyboxVS' ).textContent;
 var sb_fs = document.getElementById( 'skyboxFS' ).textContent;
 var sea_vs = document.getElementById( 'seaVS' ).textContent;
 var sea_fs = document.getElementById( 'seaFS' ).textContent;
 var snow_vs = document.getElementById( 'snowSDF/VS' ).textContent;
 var snow_fs = document.getElementById( 'snowSDF/FS' ).textContent;
+var vsAUR = document.getElementById( 'vsAUR' ).textContent; // shader abbrevs
+var fsAUR = document.getElementById( 'fsAUR' ).textContent;
+
 var texture2 = new THREE.TextureLoader().load( 'sea.png' );
 //gui = new dat.GUI( { width: 350 } );
+
+
+//aurora global variables
+var shcameraDefaultPosition = [0., 0., -6.]; // we use this in our keyboard function to reset the camera, when the space bar is hit
+var shcameraPosition = new THREE.Vector3(shcameraDefaultPosition[0],shcameraDefaultPosition[1], shcameraDefaultPosition[2] ); // camera used by the shader, NOT 3 JS
+var uniformsAUR;
+
+var texWidth = 500;
+var texHeight = 500;
+var boxGeom;
+
 //Buffer Items
 var bufferObject = new THREE.WebGLRenderTarget( window.innerWidth, window.innerHeight );
 var bufferScene = new THREE.Scene();
@@ -244,6 +405,30 @@ function init() {
 	scene = new THREE.Scene();
 
   //=====Skybox=====
+  
+  //aurora
+    uniformsAUR = {
+        iResolution: { type: "v2", value: new THREE.Vector2(texWidth, texHeight)}, // mouse coords on the plane?
+        iMouse: { type: "v2", value: new THREE.Vector2(shcameraPosition.x, shcameraPosition.y)}, // mouse at center screen
+        timeAUR: {type: "float", value: 0.0}, // time since shaders tarted
+    };
+
+    materialAUR = new THREE.RawShaderMaterial( {
+        uniforms: uniformsAUR,
+        vertexShader: vsAUR,
+        fragmentShader: fsAUR,
+    } );
+  
+  boxGeom = new THREE.BoxGeometry( 2000, 2000, 2000 ); // width, height, width segs, height segs
+  
+  boxObject = new THREE.Mesh( boxGeom, materialAUR );
+  boxObject.material.side = THREE.DoubleSide;
+  boxObject.scale.set(-1, -1, -1);
+  //boxObject.position.y -= 900;
+  bufferScene.add( boxObject );
+ 
+  
+  //cubeMap
   var cubeMap = new THREE.CubeTextureLoader()
     .setPath("./skyboxset1/ThickCloudsWater/")
     .load( [
@@ -268,7 +453,7 @@ function init() {
 
   var geometrySB = new THREE.BoxGeometry( 2000, 2000, 2000 );
   skyMesh = new THREE.Mesh( geometrySB, materialSB );
-  bufferScene.add( skyMesh );
+  //bufferScene.add( skyMesh );
 
   //====SEA====
   var seaGeometry = new THREE.PlaneGeometry(400, 400, 100, 100);
@@ -348,6 +533,9 @@ function render() {
 	object1.material.uniforms.time.value = time * 0.005;
 	renderer.render(bufferScene,bufferCamera,bufferObject);
 	object1.material.uniforms.textureBuffer.value = bufferObject.texture;
+    uniformsAUR.timeAUR.value += .5;
+    uniformsAUR.iMouse.value = new THREE.Vector2(-bufferCamera.position.x*1.5, -bufferCamera.position.y*1.5);
+
 	renderer.render( scene, camera );
 }
 	</script>
