@@ -66,7 +66,7 @@
         ///////////
         // TRI NOISE 2D
 
-        float triNoise2d(in vec2 p, float spd){ // called by hash21() and mainImage()
+        float triNoise2d(in vec2 p, float spd){
             float z=1.8;
             float z2=2.5;
             float rz = 0.;
@@ -92,12 +92,13 @@
         /////////////
         /// HASH21
 
-        float hash21(in vec2 n){ return fract(sin(dot(n, vec2(13, 4))) * 4400.); }
+        //float hash21(in vec2 n){ return fract(sin(dot(n, vec2(13, 4))) * 4400.); }
 
         ///////////////
         // AURORA - calc color of aurora at this location
 
-        vec4 aurora(vec3 ro, vec3 rd) {
+        vec4 aurora(vec3 ro, vec3 rd) { //creates aurora color and calls triNoise2D()
+	
             vec4 col = vec4(0); //empty start fragment color
             vec4 avgCol = vec4(0); //empty start average color
 
@@ -107,14 +108,13 @@
                 //bpos = boundary position
                 //pt = ray into scene
 
-                //float of = 0.01*hash21(gl_FragCoord.xy)*smoothstep(0.,15., i); //noise value (hash21()) generated from ray depth and xy vals
                 float pt = ((.8+pow(i,1.4)*.002)-ro.y)/(rd.y*2.+0.4);
 
                 vec3 bpos = ro + pt*rd;
                 vec2 p = bpos.zx;
-                float rzt = triNoise2d(p, 0.06); //noise val (triNoise2d()) coming from ?
+                float rzt = triNoise2d(p, 0.06); //noise val (triNoise2d()) coming from ? to create an alpha value
                 vec4 col2 = vec4(0,0,0, rzt); // create an "empty" color to update which has a noise generated alpha (rzt)
-                col2.rgb = (sin(1.-vec3(2.15,-.5, 1.2)+i*0.043)*0.5+0.5)*rzt;
+                col2.rgb = (sin(1.-vec3(2.15,-.5, 1.2)+i*0.043)*0.5+0.5)*rzt; //sin generated color (which is dimmed using rzt) which will be added to the average color 
                 avgCol =  mix(avgCol, col2, .5); //update average color
                 col += avgCol*exp2(-i*0.065 - 2.5)*smoothstep(0.,5., i); //update fragment color using the average color
 
