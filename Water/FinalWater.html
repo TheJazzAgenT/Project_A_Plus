@@ -145,7 +145,7 @@
 
             rd.yz *= mm2(mo.y);
 
-            rd.xz *= mm2(mo.x + sin(0.0*0.05)*0.2); //aurora x and distance values from mm2() using sine vals
+            rd.xz *= mm2(mo.x + sin(timeAUR*0.05)*0.2); //aurora x and distance values from mm2() using sine vals
             float fade = smoothstep(0.,0.01,abs(rd.y))*0.1+0.9; // return an interpolated fade factor between 0 and 1, based on the y vertical location of the framgment between 0 and 0.1
             vec3 col = vec3(0.05, 0.023, 0.18); //background color = navy
             
