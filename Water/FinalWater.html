@@ -336,7 +336,7 @@
       vec4 refractColor = textureCube( aurCube, refraction );
       //gl_FragColor = vec4(fv, fv, fv, 1.0);
       gl_FragColor = reflectColor * fv + refractColor * (1.0 - fv);
-      //gl_FragColor = refractColor;
+      //gl_FragColor = reflectColor;
 		}
     </script>
 
@@ -384,6 +384,7 @@ function init() {
   camera.position.z = 2.0;
   
   cubeCamera = new THREE.CubeCamera(1, 10000, 512);
+  cubeCamera.position.set(0, 130, 0);
   bufferScene.add(cubeCamera);
 	
 	bufferCamera = new THREE.PerspectiveCamera( 60.0, window.innerWidth / window.innerHeight, 0.1, 2000 );
@@ -540,10 +541,10 @@ function render() {
 	sea.material.uniforms.uTime.value = time * 0.0005;
   sea.visible = false;
   snow.visible = false;
-  cubeCamera.position.copy( sea.position );
   cubeCamera.update(renderer, bufferScene);
   sea.visible = true;
   snow.visible = true;
+  //boxObject.visible = false;
 	var object1 = scene.children[ 0 ];
 	object1.material.uniforms.time.value = time * 0.005;
 	renderer.render(bufferScene,bufferCamera,bufferObject);
