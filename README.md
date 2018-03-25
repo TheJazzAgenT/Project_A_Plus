@@ -1,4 +1,5 @@
 # Project_A_Plus
+
 ## Names:
 Evan Thomson - Water
 
@@ -16,3 +17,9 @@ It takes quite a bit of processing power to run.
 
 ## Video
 https://youtu.be/y-dfTA7B-9s
+
+## Documentation
+https://github.com/TheJazzAgenT/Project_A_Plus/blob/master/shader-programming-cold.pdf
+
+## Presentation Slides
+https://github.com/TheJazzAgenT/Project_A_Plus/blob/master/Final%20Project%20Presentation.pdf
