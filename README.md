@@ -7,7 +7,7 @@ Emma Yates - Auroras
 
 Mark Rahal - Falling snow
 
-Zooey Zhang - Terrain
+Xiaoxuan Zhang - Terrain
 
 
 ## Instructions
